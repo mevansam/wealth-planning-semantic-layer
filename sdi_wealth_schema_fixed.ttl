@@ -1,0 +1,236 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix fibo-fnd-aap-ppl: <https://spec.edmcouncil.org/fibo/ontology/FND/AgentsAndPeople/People/> .
+@prefix fibo-fbc-pas-caa: <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/> .
+@prefix cmns-rlcmp: <https://www.omg.org/spec/Commons/RolesAndCompositions/> .
+@prefix fwp: <http://example.org/ontology/fwp#> .
+
+fwp:SelfDirectedInvestor rdf:type owl:Class ;
+    rdfs:subClassOf fibo-fnd-aap-ppl:Person ;
+    rdfs:label "Self-Directed Investor" ;
+    rdfs:comment "A person who selects their own investments. FIBO Person is a party. This class extends that party. Ownership is the account-holder role the person plays." .
+
+fwp:SelfDirectedAccountHolder rdf:type owl:Class ;
+    rdfs:subClassOf fibo-fbc-pas-caa:CustomerAccountHolder ;
+    rdfs:label "Self-Directed Account Holder" ;
+    rdfs:comment "The account-holder role played by a self-directed investor. FIBO keeps this role separate from Person: the role is played by the person through cmns-rlcmp:isPlayedBy." .
+
+fwp:Household rdf:type owl:Class ;
+    rdfs:label "Self-Directed Investor Household" ;
+    rdfs:comment "A planning unit of people who file together. Not an autonomous agent and not an account holder." .
+
+fwp:WealthPlan rdf:type owl:Class ;
+    rdfs:label "Wealth Strategic Plan" ;
+    rdfs:comment "Policy for the household's accounts. The plan does not hold or manage the accounts." .
+
+fwp:FinancialGoal rdf:type owl:Class ;
+    rdfs:label "Financial Goal" .
+
+fwp:TaxBucket rdf:type owl:Class ;
+    rdfs:label "Tax Bucket Category" ;
+    rdfs:comment "The account's tax wrapper. Distinct from the account registration, such as Roth IRA or joint brokerage." .
+
+fwp:Holding rdf:type owl:Class ;
+    rdfs:label "Holding" ;
+    rdfs:comment "A position inside one investment account. Cost basis applies to lots in a taxable account. It is not the tax basis of a Roth or traditional IRA." .
+
+fwp:Taxable rdf:type fwp:TaxBucket ;
+    rdfs:label "Taxable" .
+
+fwp:TaxDeferred rdf:type fwp:TaxBucket ;
+    rdfs:label "Tax-deferred" .
+
+fwp:TaxFree rdf:type fwp:TaxBucket ;
+    rdfs:label "Tax-free" ;
+    rdfs:comment "Qualified Roth treatment. Withdrawals of contribution basis are a separate account fact, and earnings are tax-free only when the distribution is qualified." .
+
+fwp:hasMember rdf:type owl:ObjectProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range fibo-fnd-aap-ppl:Person .
+
+fwp:hasHeadOfHousehold rdf:type owl:ObjectProperty ;
+    rdfs:subPropertyOf fwp:hasMember .
+
+fwp:spouseOf rdf:type owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:domain fibo-fnd-aap-ppl:Person ;
+    rdfs:range fibo-fnd-aap-ppl:Person .
+
+fwp:hasWealthPlan rdf:type owl:ObjectProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range fwp:WealthPlan .
+
+fwp:includesAccount rdf:type owl:ObjectProperty ;
+    rdfs:label "includes account" ;
+    rdfs:comment "The plan covers this account. Ownership is the FIBO account-holder role played by the investor." ;
+    rdfs:domain fwp:WealthPlan ;
+    rdfs:range fibo-fbc-pas-caa:InvestmentAccount .
+
+fwp:hasTaxTreatment rdf:type owl:ObjectProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range fwp:TaxBucket .
+
+fwp:hasHolding rdf:type owl:ObjectProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range fwp:Holding .
+
+fwp:heldIn rdf:type owl:ObjectProperty , owl:FunctionalProperty ;
+    owl:inverseOf fwp:hasHolding ;
+    rdfs:domain fwp:Holding ;
+    rdfs:range fibo-fbc-pas-caa:InvestmentAccount .
+
+fwp:fundsGoal rdf:type owl:ObjectProperty ;
+    rdfs:domain [ rdf:type owl:Class ;
+                  owl:unionOf ( fibo-fbc-pas-caa:InvestmentAccount fwp:Holding ) ] ;
+    rdfs:range fwp:FinancialGoal ;
+    rdfs:comment "Assigns the whole current balance of the account, or the whole market value of the holding. Do not assert both for the same dollars." .
+
+fwp:householdName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:string .
+
+fwp:totalNetWorth rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Sum of investment-account balances in this example. The example includes no liabilities and no assets outside those accounts." .
+
+fwp:asOfDate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:date .
+
+fwp:taxYear rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:gYear .
+
+fwp:filingStatus rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:string .
+
+fwp:marginalOrdinaryRate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:decimal .
+
+fwp:longTermCapitalGainsRate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:decimal .
+
+fwp:netInvestmentIncomeTaxRate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Household ;
+    rdfs:range xsd:decimal .
+
+fwp:planName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:WealthPlan ;
+    rdfs:range xsd:string .
+
+fwp:rebalancingFrequency rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:WealthPlan ;
+    rdfs:range xsd:string .
+
+fwp:dateOfBirth rdf:type owl:DatatypeProperty ;
+    rdfs:comment "Calendar date of birth. FIBO hasDateOfBirth points at a DateOfBirth individual rather than an xsd:date, so this demo keeps the date literal on its own property." ;
+    rdfs:domain fibo-fnd-aap-ppl:Person ;
+    rdfs:range xsd:date .
+
+fwp:accountCategory rdf:type owl:DatatypeProperty ;
+    rdfs:label "account registration" ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range xsd:string .
+
+fwp:institutionName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range xsd:string .
+
+fwp:balance rdf:type owl:DatatypeProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range xsd:decimal .
+
+fwp:rothContributionBasis rdf:type owl:DatatypeProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Roth contributions that can be withdrawn without tax or penalty. Earnings are balance minus this amount." .
+
+fwp:iraNondeductibleBasis rdf:type owl:DatatypeProperty ;
+    rdfs:domain fibo-fbc-pas-caa:InvestmentAccount ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "After-tax basis inside a traditional IRA. Zero means a withdrawal is entirely pre-tax." .
+
+fwp:holdingName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Holding ;
+    rdfs:range xsd:string .
+
+fwp:marketValue rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Holding ;
+    rdfs:range xsd:decimal .
+
+fwp:costBasis rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Holding ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Lot cost basis for a taxable holding." .
+
+fwp:acquiredOn rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:Holding ;
+    rdfs:range xsd:date .
+
+fwp:goalName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:FinancialGoal ;
+    rdfs:range xsd:string .
+
+fwp:targetAmount rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:FinancialGoal ;
+    rdfs:range xsd:decimal .
+
+fwp:targetDate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:FinancialGoal ;
+    rdfs:range xsd:date ;
+    rdfs:comment "Date the target amount must be available." .
+
+fwp:spendingEndDate rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:FinancialGoal ;
+    rdfs:range xsd:date ;
+    rdfs:comment "End of a spending window. For the bridge, the date the owner reaches age 59.5." .
+
+fwp:goalHealth rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:FinancialGoal ;
+    rdfs:range xsd:string .
+
+# Tool endpoints. A class IRI is also used as an individual here (OWL 2 punning)
+# so a graph walk can go from a grounded class to the tool that returns its instances.
+fwp:DataSourceTool rdf:type owl:Class ;
+    rdfs:label "Data Source Tool" ;
+    rdfs:comment "An API tool that returns instance data for specific schema classes. OntologyRAG selects the tool from the grounded class, calls the endpoint, and aligns the payload to the schema." .
+
+fwp:toolName rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:DataSourceTool ;
+    rdfs:range xsd:string .
+
+fwp:endpointPath rdf:type owl:DatatypeProperty ;
+    rdfs:domain fwp:DataSourceTool ;
+    rdfs:range xsd:anyURI .
+
+fwp:providesInstancesOf rdf:type owl:ObjectProperty ;
+    rdfs:domain fwp:DataSourceTool ;
+    rdfs:range rdfs:Class ;
+    rdfs:comment "Schema class whose individuals this tool returns." .
+
+fwp:providedByTool rdf:type owl:ObjectProperty ;
+    owl:inverseOf fwp:providesInstancesOf ;
+    rdfs:comment "From a grounded class, the tool that returns its instances." .
+
+fwp:CustomerProfileTool rdf:type fwp:DataSourceTool ;
+    rdfs:label "CustomerProfile" ;
+    fwp:toolName "CustomerProfile" ;
+    fwp:endpointPath "http://example.org/api/tools/customer-profile"^^xsd:anyURI ;
+    fwp:providesInstancesOf fwp:Household, fibo-fnd-aap-ppl:Person, fwp:SelfDirectedInvestor .
+
+fwp:WealthPlanningTool rdf:type fwp:DataSourceTool ;
+    rdfs:label "WealthPlanning" ;
+    fwp:toolName "WealthPlanning" ;
+    fwp:endpointPath "http://example.org/api/tools/wealth-planning"^^xsd:anyURI ;
+    fwp:providesInstancesOf fwp:WealthPlan, fwp:FinancialGoal .
+
+fwp:AccountDataTool rdf:type fwp:DataSourceTool ;
+    rdfs:label "AccountData" ;
+    fwp:toolName "AccountData" ;
+    fwp:endpointPath "http://example.org/api/tools/account-data"^^xsd:anyURI ;
+    fwp:providesInstancesOf fibo-fbc-pas-caa:InvestmentAccount, fibo-fbc-pas-caa:CustomerAccount, fwp:Holding, fwp:TaxBucket, fwp:SelfDirectedAccountHolder .

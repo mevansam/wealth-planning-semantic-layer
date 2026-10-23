@@ -1,0 +1,135 @@
+{
+  "@context": {
+    "fwp": "http://example.org/ontology/fwp#",
+    "fibo-fnd-aap-ppl": "https://spec.edmcouncil.org/fibo/ontology/FND/AgentsAndPeople/People/",
+    "fibo-fbc-pas-caa": "https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/ClientsAndAccounts/",
+    "cmns-rlcmp": "https://www.omg.org/spec/Commons/RolesAndCompositions/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@graph": [
+    {
+      "@id": "fwp:household_miller",
+      "@type": "fwp:Household",
+      "fwp:householdName": "Miller Self-Directed Wealth Unit",
+      "fwp:asOfDate": { "@value": "2026-10-23", "@type": "xsd:date" },
+      "fwp:totalNetWorth": { "@value": "2450000.00", "@type": "xsd:decimal" },
+      "fwp:taxYear": { "@value": "2026", "@type": "xsd:gYear" },
+      "fwp:filingStatus": "Married filing jointly",
+      "fwp:marginalOrdinaryRate": { "@value": "0.32", "@type": "xsd:decimal" },
+      "fwp:longTermCapitalGainsRate": { "@value": "0.15", "@type": "xsd:decimal" },
+      "fwp:netInvestmentIncomeTaxRate": { "@value": "0.038", "@type": "xsd:decimal" },
+      "fwp:hasHeadOfHousehold": { "@id": "fwp:person_david_miller" },
+      "fwp:hasMember": [
+        { "@id": "fwp:person_david_miller" },
+        { "@id": "fwp:person_elena_miller" }
+      ],
+      "fwp:hasWealthPlan": { "@id": "fwp:plan_miller_core" }
+    },
+    {
+      "@id": "fwp:person_david_miller",
+      "@type": "fwp:SelfDirectedInvestor",
+      "fibo-fnd-aap-ppl:hasPersonName": "David Miller",
+      "fwp:dateOfBirth": { "@value": "1979-06-15", "@type": "xsd:date" },
+      "fwp:spouseOf": { "@id": "fwp:person_elena_miller" }
+    },
+    {
+      "@id": "fwp:person_elena_miller",
+      "@type": "fwp:SelfDirectedInvestor",
+      "fibo-fnd-aap-ppl:hasPersonName": "Elena Miller",
+      "fwp:dateOfBirth": { "@value": "1981-04-03", "@type": "xsd:date" }
+    },
+    {
+      "@id": "fwp:holder_david",
+      "@type": "fwp:SelfDirectedAccountHolder",
+      "cmns-rlcmp:isPlayedBy": { "@id": "fwp:person_david_miller" }
+    },
+    {
+      "@id": "fwp:holder_elena",
+      "@type": "fwp:SelfDirectedAccountHolder",
+      "cmns-rlcmp:isPlayedBy": { "@id": "fwp:person_elena_miller" }
+    },
+    {
+      "@id": "fwp:plan_miller_core",
+      "@type": "fwp:WealthPlan",
+      "fwp:planName": "Miller 2026 Core Financial Freedom Roadmap",
+      "fwp:rebalancingFrequency": "Quarterly",
+      "fwp:includesAccount": [
+        {
+          "@id": "fwp:account_taxable_brokerage",
+          "@type": ["fibo-fbc-pas-caa:InvestmentAccount", "fibo-fbc-pas-caa:CustomerAccount"],
+          "fwp:accountCategory": "Joint taxable brokerage",
+          "fwp:institutionName": "Charles Schwab",
+          "fibo-fbc-pas-caa:hasPrimaryAccountHolder": { "@id": "fwp:holder_david" },
+          "fibo-fbc-pas-caa:hasSecondaryAccountHolder": { "@id": "fwp:holder_elena" },
+          "fwp:balance": { "@value": "1200000.00", "@type": "xsd:decimal" },
+          "fwp:hasTaxTreatment": { "@id": "fwp:Taxable" },
+          "fwp:hasHolding": {
+            "@id": "fwp:holding_schwab_equity",
+            "@type": "fwp:Holding",
+            "fwp:holdingName": "Total market equity ETF",
+            "fwp:marketValue": { "@value": "1200000.00", "@type": "xsd:decimal" },
+            "fwp:costBasis": { "@value": "720000.00", "@type": "xsd:decimal" },
+            "fwp:acquiredOn": { "@value": "2019-06-14", "@type": "xsd:date" }
+          },
+          "fwp:fundsGoal": {
+            "@id": "fwp:goal_early_retirement",
+            "@type": "fwp:FinancialGoal",
+            "fwp:goalName": "Early retirement bridge (age 53 through 59.5)",
+            "fwp:targetAmount": { "@value": "1500000.00", "@type": "xsd:decimal" },
+            "fwp:targetDate": { "@value": "2032-12-31", "@type": "xsd:date" },
+            "fwp:spendingEndDate": { "@value": "2038-12-15", "@type": "xsd:date" },
+            "fwp:goalHealth": "Shortfall"
+          }
+        },
+        {
+          "@id": "fwp:account_roth_ira",
+          "@type": ["fibo-fbc-pas-caa:InvestmentAccount", "fibo-fbc-pas-caa:CustomerAccount"],
+          "fwp:accountCategory": "Roth IRA",
+          "fwp:institutionName": "Vanguard",
+          "fibo-fbc-pas-caa:hasPrimaryAccountHolder": { "@id": "fwp:holder_david" },
+          "fwp:balance": { "@value": "450000.00", "@type": "xsd:decimal" },
+          "fwp:rothContributionBasis": { "@value": "150000.00", "@type": "xsd:decimal" },
+          "fwp:hasTaxTreatment": { "@id": "fwp:TaxFree" },
+          "fwp:hasHolding": {
+            "@id": "fwp:holding_vanguard_equity",
+            "@type": "fwp:Holding",
+            "fwp:holdingName": "Global equity index fund",
+            "fwp:marketValue": { "@value": "450000.00", "@type": "xsd:decimal" }
+          },
+          "fwp:fundsGoal": {
+            "@id": "fwp:goal_tax_free_growth",
+            "@type": "fwp:FinancialGoal",
+            "fwp:goalName": "Tax-free long-horizon growth",
+            "fwp:targetAmount": { "@value": "1000000.00", "@type": "xsd:decimal" },
+            "fwp:targetDate": { "@value": "2045-01-01", "@type": "xsd:date" },
+            "fwp:goalHealth": "Shortfall"
+          }
+        },
+        {
+          "@id": "fwp:account_traditional_ira",
+          "@type": ["fibo-fbc-pas-caa:InvestmentAccount", "fibo-fbc-pas-caa:CustomerAccount"],
+          "fwp:accountCategory": "Traditional IRA",
+          "fwp:institutionName": "Fidelity",
+          "fibo-fbc-pas-caa:hasPrimaryAccountHolder": { "@id": "fwp:holder_david" },
+          "fwp:balance": { "@value": "800000.00", "@type": "xsd:decimal" },
+          "fwp:iraNondeductibleBasis": { "@value": "0.00", "@type": "xsd:decimal" },
+          "fwp:hasTaxTreatment": { "@id": "fwp:TaxDeferred" },
+          "fwp:hasHolding": {
+            "@id": "fwp:holding_fidelity_bond",
+            "@type": "fwp:Holding",
+            "fwp:holdingName": "US aggregate bond fund",
+            "fwp:marketValue": { "@value": "800000.00", "@type": "xsd:decimal" }
+          },
+          "fwp:fundsGoal": {
+            "@id": "fwp:goal_retirement_income",
+            "@type": "fwp:FinancialGoal",
+            "fwp:goalName": "Retirement income after age 59.5",
+            "fwp:targetAmount": { "@value": "1500000.00", "@type": "xsd:decimal" },
+            "fwp:targetDate": { "@value": "2038-12-15", "@type": "xsd:date" },
+            "fwp:goalHealth": "Shortfall"
+          }
+        }
+      ]
+    }
+  ]
+}
