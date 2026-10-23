@@ -92,7 +92,14 @@ sequenceDiagram
   LLM-->>UI: answer with citations
 ```
 
-On startup the process parses `../sdi_wealth_schema_fixed.ttl` and `../sdi_household_instance.jsonld` into one rdflib graph. Tool projections are queries over that graph. The merged working graph for the walk is the union of the three payloads and the Turtle file, which is the same graph the process already loaded. The merge card still draws the cross-tool IRIs resolving, so the audience sees the contract from [SPEC.md](../SPEC.md#data-source-tools).
+On startup the process loads the two source files into one rdflib graph.
+
+| File | Role |
+| --- | --- |
+| `sdi_wealth_schema_fixed.ttl` | TBox. Classes, properties, tax-bucket individuals, and the three data-source tools. |
+| `sdi_household_instance.jsonld` | ABox. The merged household graph after the three tool responses are aligned. |
+
+Tool projections are queries over that graph. The merged working graph for the walk is the union of the three payloads and the Turtle file, which is the same graph the process already loaded. The merge card still draws the cross-tool IRIs resolving, so the audience sees the contract from [SPEC.md](../SPEC.md#data-source-tools).
 
 ## OntologyRAG grounding
 

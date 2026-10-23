@@ -10,8 +10,6 @@ It is a technical demonstration of retrieval. It is not tax, legal, or investmen
 | --- | --- |
 | `sdi_wealth_schema_fixed.ttl` | TBox. Classes, properties, tax-bucket individuals, and the three data-source tools. |
 | `sdi_household_instance.jsonld` | ABox. The merged household graph after the three tool responses are aligned. |
-| [SPEC.md](SPEC.md) | Data contract. Diagrams, class and property tables, household facts, and allowed conclusions. |
-| [demo/README.md](demo/README.md) | Demo application specification. Retrieval loop, tool queries, and the trace UI. No application code yet. |
 
 Both files are RDF. Turtle is a schema syntax, and JSON-LD is an instance syntax. Either store can load either file. The split is terminological knowledge versus asserted facts, not "graph database versus vector database."
 
