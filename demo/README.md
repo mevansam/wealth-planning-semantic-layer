@@ -93,7 +93,7 @@ Phrasings:
 | API | Python 3.12, FastAPI | Loads the RDF files, runs the loop, streams trace events. |
 | RDF | [rdflib](https://rdflib.readthedocs.io/) | Parses the Turtle TBox and the JSON-LD ABox. Tool payloads and the graph walk are SPARQL. |
 | Reasoning | SPARQL property paths | `^fwp:providesInstancesOf`, `^fwp:hasHolding`, and `fwp:hasMember` / `fwp:hasHeadOfHousehold` via `rdfs:subPropertyOf`. No OWL DL reasoner. |
-| Policy index | [fastembed](https://github.com/qdrant/fastembed) in process | Embeds a handful of local policy passages and the account-neighborhood cards. No separate vector database. |
+| Embeddings | [fastembed](https://github.com/qdrant/fastembed) in process | One in-memory index. It embeds the graph lexicon used to pick seeds before the walk: `rdfs:label`, `rdfs:comment`, datatype literals, and camel-case local names. It also embeds the policy passages. No separate vector database. A lexical overlap ranker is the fallback when the model is not loaded. |
 | Arithmetic | Python function | Computes the figures in [SPEC.md](../SPEC.md#what-the-50000-question-is-allowed-to-conclude) from retrieved decimals. |
 | Model | OpenAI-compatible chat endpoint | `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in the environment. The model explains retrieved facts. It does not choose tools and it does not originate the tax figures. |
 | UI | Vite, React, TypeScript | Step timeline. Cards appear as server-sent events arrive. |
