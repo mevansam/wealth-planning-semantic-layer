@@ -69,7 +69,7 @@ demo/
 ```mermaid
 sequenceDiagram
   participant UI
-  participant Loop
+  participant Controller
   participant TBox
   participant Tools
   participant Walk
@@ -77,18 +77,18 @@ sequenceDiagram
   participant Calc
   participant LLM
 
-  UI->>Loop: question, household_miller
-  Loop->>TBox: ground phrases
-  Loop->>TBox: inverse providesInstancesOf
-  Loop->>Tools: CustomerProfile, WealthPlanning, AccountData
-  Tools-->>Loop: three payloads
-  Loop->>Walk: named accounts only
-  Loop->>LLM: neighborhood so far
-  LLM-->>Loop: missing sibling, rules, or figures
-  Loop->>Walk: plan siblings
-  Loop->>Policy: passages for the grounded buckets
-  Loop->>Calc: rates, basis, balances, dates
-  Loop->>LLM: full trace
+  UI->>Controller: question, household_miller
+  Controller->>TBox: ground phrases
+  Controller->>TBox: inverse providesInstancesOf
+  Controller->>Tools: CustomerProfile, WealthPlanning, AccountData
+  Tools-->>Controller: three payloads
+  Controller->>Walk: named accounts only
+  Controller->>LLM: neighborhood so far
+  LLM-->>Controller: missing sibling, rules, or figures
+  Controller->>Walk: plan siblings
+  Controller->>Policy: passages for the grounded buckets
+  Controller->>Calc: rates, basis, balances, dates
+  Controller->>LLM: full trace
   LLM-->>UI: answer with citations
 ```
 
