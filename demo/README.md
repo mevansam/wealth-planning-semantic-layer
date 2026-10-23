@@ -19,14 +19,14 @@ Match the question to labels, comments, and literals in the graph
   → tools are whatever ^providesInstancesOf returns for the grounded types
   → query the household JSON-LD with those tools
   → merge the payloads with the Turtle file
-  → walk two hops from the grounded individuals along object properties in the TBox
+  → keep triples that touch a grounded individual, plus literals on the other end of each triple
   → policy passages similar to the question, and calculator formulas whose operands were retrieved
   → model may name one more subject and property
   → controller expands that pair only when both IRIs are already in the graph
   → final answer cites the trace
 ```
 
-The Fidelity account appears in a Schwab question when the walk reaches the plan and follows `fwp:includesAccount`. That edge is in the graph. There is no sibling rule and no intent id.
+A question that matches the Schwab account does not describe the Fidelity IRA. The plan links both accounts, and following that link would put Fidelity's balance, basis, and goal into the prompt even though the question never named them. The model could then talk about Fidelity as if it had been asked. The walk stops at the grounded accounts. Fidelity stays out of the trace unless the question matches it, or the model asks to follow `fwp:includesAccount` and that expansion is shown as its own step.
 
 ## Question checks
 
@@ -34,7 +34,7 @@ The names in this section are checks, not branches. The runtime never reads them
 
 | Check | Facts the neighborhood of the matched seeds contains |
 | --- | --- |
-| `withdrawal` | Schwab is the joint taxable account. Its lot was acquired 2019-06-14. On 50,000 of proceeds the gain is 20,000 and the tax is 3,760, so net cash is 46,240. Netting 50,000 takes 54,065.74 of proceeds and widens the bridge shortfall of 300,000. Vanguard is David's Roth: contribution basis 150,000, earnings 300,000, and he is 47, so earnings are not a qualified distribution. Fidelity is the traditional IRA: nondeductible basis 0, so 50,000 is pre-tax at 0.32, tax 16,000, before any early-distribution additional tax. That additional tax is not calculated. |
+| `withdrawal` | Schwab is the joint taxable account. Its lot was acquired 2019-06-14. On 50,000 of proceeds the gain is 20,000 and the tax is 3,760, so net cash is 46,240. Netting 50,000 takes 54,065.74 of proceeds and widens the bridge shortfall of 300,000. Vanguard is David's Roth: contribution basis 150,000, earnings 300,000, and he is 47, so earnings are not a qualified distribution. The Fidelity IRA is not in the trace, and the answer does not cite it. |
 | `bridge_funding` | `fwp:goal_early_retirement` is funded by `fwp:account_taxable_brokerage` through `fwp:fundsGoal`. Balance 1,200,000, target 1,500,000 by 2032-12-31, spending ends 2038-12-15, status Shortfall. The Schwab holding sits inside that account and has no `fwp:fundsGoal` of its own. The Roth and the traditional IRA fund the other two goals. |
 | `roth_owner` | The Vanguard Roth has one holder role, `fwp:holder_david`, played by David through `cmns-rlcmp:isPlayedBy`. Elena is not a holder. David remains a `fwp:SelfDirectedInvestor`. The holder role is the ownership fact. |
 | `asset_location` | The US aggregate bond fund is the holding in the Fidelity traditional IRA, bucket `fwp:TaxDeferred`. Equities are the total market equity ETF in the Schwab taxable account and the global equity index fund in the Vanguard Roth. Quarterly rebalancing is recorded. Target weights are not. |
@@ -44,7 +44,7 @@ The names in this section are checks, not branches. The runtime never reads them
 
 Phrasings:
 
-**`withdrawal`.** The phrasings match the Schwab and Vanguard account literals. The plan link then reaches the Fidelity account.
+**`withdrawal`.** The phrasings match the Schwab and Vanguard account literals. Each seed is described with its holding, tax bucket, goal, and holder. The Fidelity account is not described.
 
 - I need $50,000 for an unexpected expense. Should I take it from the Schwab account or the Vanguard account?
 - Where should I pull fifty thousand dollars, Charles Schwab or the Roth at Vanguard?
@@ -141,7 +141,7 @@ sequenceDiagram
   Controller->>TBox: inverse providesInstancesOf for grounded types
   Controller->>Tools: only the tools that match returns
   Tools-->>Controller: payloads
-  Controller->>Walk: two hops along TBox object properties
+  Controller->>Walk: grounded individuals and their direct links
   Controller->>Policy: passages similar to the question
   Controller->>Calc: formulas whose operands were retrieved
   Controller->>LLM: trace and frontier edges
@@ -197,16 +197,24 @@ The JSON-LD file nests accounts and goals inside the plan. The queries lift each
 
 The walk is the same neighborhood function for every question. It is not a community-summary index, and it does not switch on the check name.
 
-From each grounded individual, follow object properties declared in the TBox, and properties declared `owl:inverseOf` those properties, for two hops. When a property has subproperties, the hop uses a SPARQL path over `rdfs:subPropertyOf*`, so a member hop also returns `fwp:hasHeadOfHousehold`. Every triple whose subject is a reached individual is included. Edges that leave that frontier stay on the trace as unresolved IRIs.
+The walk has one pattern for every class. `?seed` is whatever individual the text match grounded. A property hop also follows `rdfs:subPropertyOf*`, so a `fwp:hasMember` hop includes `fwp:hasHeadOfHousehold`.
 
-A Schwab seed therefore reaches the plan in one hop and the Fidelity account in the second hop, because `fwp:includesAccount` connects them. The Fidelity holding, bucket, and goal are triples of that reached account. No rule names Fidelity.
+```sparql
+VALUES ?seed { <the grounded individual IRIs> }
+{ ?seed ?property ?neighbor }
+UNION
+{ ?neighbor ?property ?seed }
+?neighbor ?literalProperty ?literal .
+FILTER (isLiteral(?literal))
+```
 
-The walk card draws whichever of these paths the neighborhood actually contains:
+The union keeps a triple when the seed is either the subject or the object. The literal pattern names that neighbor. It does not follow a second object property out of the neighbor. There is no account rule, plan rule, or holder rule.
 
-- account to holder role to person
-- account to tax bucket
-- plan to account to holding
-- account to goal
+Applied to a Schwab seed, the outgoing triples bind its holding, tax bucket, goal, and holder role, and the literals on those nodes. The incoming `fwp:includesAccount` triple binds the plan, and the literals on the plan. It does not bind the plan's other `fwp:includesAccount` objects, so the Fidelity account is not in the result. The same pattern applied to a goal seed binds the account on the other end of `fwp:fundsGoal` and stops there. The same pattern applied to a holding seed binds its account and stops there.
+
+A second hop runs only as an expansion the trace shows. The model names a neighbor already in the result and a property in the TBox. That is how a holder role becomes a person: the first pattern returns the holder IRI, and the expansion follows `cmns-rlcmp:isPlayedBy`. The same expansion is how the plan's other accounts would be retrieved. Until that card appears, those individuals are not in the context.
+
+The walk card draws the triples the pattern returned. A holder role is in the first result. The person on the other side of `cmns-rlcmp:isPlayedBy` appears only after an expansion card.
 
 Holdings do not have `fwp:fundsGoal` in this fixture. The card shows the account-level link only.
 
@@ -285,7 +293,7 @@ The first version has no login and no second household. The model does not choos
 A scripted run against the current Turtle and JSON-LD files passes when:
 
 1. A tool payload contains only the classes in its binding, with cross-tool links as IRIs. Tax-bucket individuals are attributed to the Turtle file when AccountData runs.
-2. The Schwab phrasings ground to `fwp:account_taxable_brokerage` and `fwp:account_roth_ira` by matching literals. The Fidelity account is in that neighborhood because `fwp:includesAccount` reaches it in two hops.
+2. The Schwab phrasings ground to `fwp:account_taxable_brokerage` and `fwp:account_roth_ira` by matching literals. The neighborhood describes those accounts and does not describe `fwp:account_traditional_ira`.
 3. The household phrasings return David as a member through `rdfs:subPropertyOf`, using that same walk.
 4. Calculator outputs match the data-contract figures only when the operands were retrieved. No run outputs a 10 percent penalty amount.
 5. Every phrasing in a check grounds to the same seed IRIs. The answer cites only IRIs and passages on that trace.
@@ -295,7 +303,7 @@ A scripted run against the current Turtle and JSON-LD files passes when:
 
 1. Load both RDF files and implement the three projections with tests for the partition rules.
 2. Implement graph-text grounding and `^fwp:providesInstancesOf` selection.
-3. Implement the two-hop walk, including inverses and subproperty paths.
+3. Implement the grounded-individual walk, including subproperty paths, and leave unmentioned accounts unresolved.
 4. Add the policy passages, embeddings, and the lexical fallback.
 5. Add the calculator and lock its outputs to the data-contract figures.
 6. Add the model adapter and the expansion check against the TBox.
