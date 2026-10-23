@@ -2,7 +2,7 @@
 
 This document plans the application that runs the [use case](../README.md) against the [data contract](../SPEC.md). No application code is in this folder yet.
 
-The demo answers one question and shows every step on screen:
+The demo runs a fixed catalog of questions and shows every step on screen. The first intent is:
 
 > I need $50,000 for an unexpected expense. Should I take it from the Schwab account or the Vanguard account?
 
@@ -26,6 +26,66 @@ Ground the question on the TBox
 ```
 
 The first walk is deliberately limited to the accounts named in the question. The loop exists so the audience can see a second retrieval, not because the model is trusted to notice the gap on its own. A controller guard adds the sibling account and the policy passages when the withdrawal intent is active and those items are absent. The trace labels that guard separately from anything the model requested.
+
+## Question catalog
+
+Each intent has several phrasings. The gazetteer maps every phrasing to one intent id. That id, not the wording, chooses the tools, the seeds, and the walk. Two phrasings of the same intent therefore show the same grounding card, the same seed IRIs, and the same required citations. The model may phrase the prose differently. It may not add or drop a cited fact.
+
+The answer may use only triples and passages on the trace for that intent. A fact that belongs to another intent stays out unless this intent's walk retrieved it.
+
+| Intent | Stable answer from the trace |
+| --- | --- |
+| `withdrawal` | Schwab is the joint taxable account. Its lot was acquired 2019-06-14. On 50,000 of proceeds the gain is 20,000 and the tax is 3,760, so net cash is 46,240. Netting 50,000 takes 54,065.74 of proceeds and widens the bridge shortfall of 300,000. Vanguard is David's Roth: contribution basis 150,000, earnings 300,000, and he is 47, so earnings are not a qualified distribution. Fidelity is the traditional IRA: nondeductible basis 0, so 50,000 is pre-tax at 0.32, tax 16,000, before any early-distribution additional tax. That additional tax is not calculated. |
+| `bridge_funding` | `fwp:goal_early_retirement` is funded by `fwp:account_taxable_brokerage` through `fwp:fundsGoal`. Balance 1,200,000, target 1,500,000 by 2032-12-31, spending ends 2038-12-15, status Shortfall. The Schwab holding sits inside that account and has no `fwp:fundsGoal` of its own. The Roth and the traditional IRA fund the other two goals. |
+| `roth_owner` | The Vanguard Roth has one holder role, `fwp:holder_david`, played by David through `cmns-rlcmp:isPlayedBy`. Elena is not a holder. David remains a `fwp:SelfDirectedInvestor`. The holder role is the ownership fact. |
+| `asset_location` | The US aggregate bond fund is the holding in the Fidelity traditional IRA, bucket `fwp:TaxDeferred`. Equities are the total market equity ETF in the Schwab taxable account and the global equity index fund in the Vanguard Roth. Quarterly rebalancing is recorded. Target weights are not. |
+| `filing_unit` | David and Elena are members. David is head, and the member query returns him again because `fwp:hasHeadOfHousehold` is a subproperty of `fwp:hasMember`. Elena is his spouse. Filing status is married filing jointly. |
+| `tax_treatment` | The Schwab account's registration is "Joint taxable brokerage" (`fwp:accountCategory`). Its tax treatment is the individual `fwp:Taxable` via `fwp:hasTaxTreatment`. The two facts stay separate. |
+| `no_such_fact` | The trace has no target weights and no computed 10 percent additional tax. The answer says those values are not in the retrieved context. |
+
+Phrasings:
+
+**`withdrawal`.** Tools: all three. Walk: named accounts, then the Fidelity sibling. Calculator and policy passages are required.
+
+- I need $50,000 for an unexpected expense. Should I take it from the Schwab account or the Vanguard account?
+- Where should I pull fifty thousand dollars, Charles Schwab or the Roth at Vanguard?
+- If I have to raise 50000 in cash, which is the better source, the joint brokerage or the Vanguard IRA?
+
+**`bridge_funding`.** Tools: WealthPlanning and AccountData. Seed: the bridge goal, then the account on the inverse of `fwp:fundsGoal`.
+
+- Which account is funding the early retirement bridge?
+- What pays for the goal that runs until David is 59 and a half?
+- Where does the money for the age-53 bridge sit?
+
+**`roth_owner`.** Tools: AccountData and CustomerProfile. Seed: the Vanguard account, then `hasPrimaryAccountHolder` and `isPlayedBy`.
+
+- Who owns the Vanguard account?
+- Is Elena on the Roth IRA?
+- Whose name is on the Vanguard Roth?
+
+**`asset_location`.** Tool: AccountData. Seed: every holding, its account, and that account's tax bucket.
+
+- Where are the bonds?
+- Which account holds the bond fund?
+- Are the equities in the taxable account and the Roth?
+
+**`filing_unit`.** Tool: CustomerProfile. Seed: `fwp:household_miller`, its members, its head, and `fwp:filingStatus`.
+
+- Who is in the Miller household?
+- Who files this return?
+- Is the head of household also a member?
+
+**`tax_treatment`.** Tool: AccountData. Seed: the Schwab account, `fwp:accountCategory`, and `fwp:hasTaxTreatment`.
+
+- What is the tax treatment of the Schwab account?
+- Is the joint brokerage taxable, or is that just its registration?
+- Which tax bucket is the Charles Schwab account in?
+
+**`no_such_fact`.** Tool: AccountData for the plan's rebalancing frequency, and the policy index for the early-distribution passage. The walk stops there.
+
+- What should the quarterly rebalance buy?
+- What are the target weights?
+- How much is the 10 percent early-distribution penalty on a Fidelity withdrawal?
 
 ## Tech stack
 
@@ -103,18 +163,22 @@ Tool projections are queries over that graph. The merged working graph for the w
 
 ## OntologyRAG grounding
 
-Grounding is a gazetteer, so the same question produces the same trace every time.
+Grounding is a gazetteer. It maps the phrasing to an intent id in the question catalog, then binds the names in that phrasing to IRIs. Every phrasing of one intent produces the same seeds.
 
 | Text in the question | Binding |
 | --- | --- |
-| Schwab | `fwp:institutionName` "Charles Schwab" on an investment account |
-| Vanguard | `fwp:institutionName` "Vanguard" |
-| need $50,000, take it, expense | Withdrawal intent. Relevant accounts are those with `fwp:hasTaxTreatment` and `fwp:fundsGoal`. |
+| Schwab, Charles Schwab, joint brokerage | `fwp:institutionName` "Charles Schwab" on `fwp:account_taxable_brokerage` |
+| Vanguard, Roth at Vanguard, Vanguard IRA | `fwp:institutionName` "Vanguard" on `fwp:account_roth_ira` |
+| Fidelity, bond fund | `fwp:account_traditional_ira` and `fwp:holding_fidelity_bond` |
+| need $50,000, pull fifty thousand, raise 50000 | Intent `withdrawal` |
+| bridge, age 53, 59 and a half | Intent `bridge_funding`, goal `fwp:goal_early_retirement` |
+| who owns, whose name, is Elena on | Intent `roth_owner` |
+| household, who files, head of household | Intent `filing_unit` |
+| tax treatment, tax bucket, registration | Intent `tax_treatment` |
+| target weights, what should the rebalance buy, 10 percent penalty | Intent `no_such_fact` |
 | household chip | `fwp:household_miller` |
 
-Activated classes are `fwp:Household`, `fibo-fnd-aap-ppl:Person`, `fwp:SelfDirectedInvestor`, `fwp:WealthPlan`, `fwp:FinancialGoal`, `fibo-fbc-pas-caa:InvestmentAccount`, `fwp:Holding`, `fwp:TaxBucket`, and `fwp:SelfDirectedAccountHolder`.
-
-Tool selection reads the stored `fwp:providesInstancesOf` triples and walks `^fwp:providesInstancesOf`. It does not look for a stored `fwp:providedByTool` triple. The three classes above select all three tools. The card lists each class and the tool it selected.
+Tool selection reads the stored `fwp:providesInstancesOf` triples and walks `^fwp:providesInstancesOf` from the classes that intent activates. It does not look for a stored `fwp:providedByTool` triple. The card lists each class and the tool it selected. Only `withdrawal` activates all three tools.
 
 `fwp:hasHeadOfHousehold` is an `rdfs:subPropertyOf` `fwp:hasMember`. The member lookup is a SPARQL property path that follows `rdfs:subPropertyOf*`. The card shows David returned both as the asserted head and as a member through that path. Elena is an asserted member.
 
@@ -235,7 +299,7 @@ Every card is one server-sent event. `id` is stable for citations.
 One page.
 
 - Header states that this is a retrieval demonstration and not tax advice.
-- The question field is prefilled. The household chip is `fwp:household_miller` and is not editable in this version.
+- The question control lists each intent, and under it the phrasings from the catalog. Choosing a second phrasing of the same intent reruns the trace. The household chip is `fwp:household_miller` and is not editable in this version.
 - The timeline grows under the question. Tool cards show the projection, including IRIs that are not yet expanded. The walk card highlights the four paths. Model cards show call 1 and call 2 separately.
 - The answer panel pins under the timeline and links each citation to its card.
 
@@ -251,7 +315,8 @@ A scripted run against the current Turtle and JSON-LD files passes when:
 4. David is returned for a member query through `rdfs:subPropertyOf`.
 5. Calculator outputs match the figures in the data contract, and the early-distribution additional tax is absent from those outputs.
 6. The final answer cites the three accounts, their buckets, their goals, the calculator, and at least one policy passage.
-7. The timeline shows two model calls and the controller guard.
+7. The timeline shows two model calls and the controller guard for `withdrawal`.
+8. Every phrasing of one intent grounds to the same intent id, the same seed IRIs, and the same required citations. `no_such_fact` cites neither target weights nor a computed penalty.
 
 ## Build order
 
@@ -262,6 +327,6 @@ A scripted run against the current Turtle and JSON-LD files passes when:
 5. Add the calculator and lock its outputs to the data-contract figures.
 6. Add the model adapter, the response schema, and the one-hop guard.
 7. Stream the trace over server-sent events.
-8. Build the timeline page and run the scripted question in the browser.
+8. Build the timeline page and run every phrasing in the question catalog in the browser.
 
 Each step is demoable in a terminal before the page exists. The page is the last step because the trace schema above is the contract it renders.
