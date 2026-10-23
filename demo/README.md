@@ -2,7 +2,7 @@
 
 This document plans the application that runs the [use case](../README.md) against the [data contract](../SPEC.md). No application code is in this folder yet.
 
-The demo runs a fixed catalog of questions and shows every step on screen. The first intent is:
+The demo runs the questions below through one loop and shows every step on screen. One example is:
 
 > I need $50,000 for an unexpected expense. Should I take it from the Schwab account or the Vanguard account?
 
@@ -12,28 +12,27 @@ A useful answer follows holder, tax-bucket, holding, and goal links, then applie
 
 The question is prefilled and the household is fixed as `fwp:household_miller`. Running it appends one card per step, in order. Each card shows its input, its output, and the triples or passages that step added. The final card is the answer, with citations back to earlier cards.
 
-The scripted run is one loop with two model calls:
+Every question uses the same loop. Nothing in the controller picks a path from the wording.
 
 ```text
-Ground the question on the TBox
-  → select CustomerProfile, WealthPlanning, and AccountData
-  → query the household JSON-LD once per tool
-  → merge the three payloads with the Turtle file
-  → GraphRAG walk of the named Schwab and Vanguard accounts
-  → first model call: what is still missing
-  → controller hop: the Fidelity sibling on the same plan, policy passages, calculator
-  → second model call: final answer citing those steps
+Match the question to labels, comments, and literals in the graph
+  → tools are whatever ^providesInstancesOf returns for the grounded types
+  → query the household JSON-LD with those tools
+  → merge the payloads with the Turtle file
+  → walk two hops from the grounded individuals along object properties in the TBox
+  → policy passages similar to the question, and calculator formulas whose operands were retrieved
+  → model may name one more subject and property
+  → controller expands that pair only when both IRIs are already in the graph
+  → final answer cites the trace
 ```
 
-The first walk is deliberately limited to the accounts named in the question. The loop exists so the audience can see a second retrieval, not because the model is trusted to notice the gap on its own. A controller guard adds the sibling account and the policy passages when the withdrawal intent is active and those items are absent. The trace labels that guard separately from anything the model requested.
+The Fidelity account appears in a Schwab question when the walk reaches the plan and follows `fwp:includesAccount`. That edge is in the graph. There is no sibling rule and no intent id.
 
-## Question catalog
+## Question checks
 
-Each intent has several phrasings. The gazetteer maps every phrasing to one intent id. That id, not the wording, chooses the tools, the seeds, and the walk. Two phrasings of the same intent therefore show the same grounding card, the same seed IRIs, and the same required citations. The model may phrase the prose differently. It may not add or drop a cited fact.
+The names in this section are checks, not branches. The runtime never reads them. Each check lists phrasings that should match the same graph text and therefore the same seed IRIs. The facts are what a two-hop neighborhood of those seeds contains. The model may phrase the prose differently. It may cite only triples and passages on that trace.
 
-The answer may use only triples and passages on the trace for that intent. A fact that belongs to another intent stays out unless this intent's walk retrieved it.
-
-| Intent | Stable answer from the trace |
+| Check | Facts the neighborhood of the matched seeds contains |
 | --- | --- |
 | `withdrawal` | Schwab is the joint taxable account. Its lot was acquired 2019-06-14. On 50,000 of proceeds the gain is 20,000 and the tax is 3,760, so net cash is 46,240. Netting 50,000 takes 54,065.74 of proceeds and widens the bridge shortfall of 300,000. Vanguard is David's Roth: contribution basis 150,000, earnings 300,000, and he is 47, so earnings are not a qualified distribution. Fidelity is the traditional IRA: nondeductible basis 0, so 50,000 is pre-tax at 0.32, tax 16,000, before any early-distribution additional tax. That additional tax is not calculated. |
 | `bridge_funding` | `fwp:goal_early_retirement` is funded by `fwp:account_taxable_brokerage` through `fwp:fundsGoal`. Balance 1,200,000, target 1,500,000 by 2032-12-31, spending ends 2038-12-15, status Shortfall. The Schwab holding sits inside that account and has no `fwp:fundsGoal` of its own. The Roth and the traditional IRA fund the other two goals. |
@@ -45,43 +44,43 @@ The answer may use only triples and passages on the trace for that intent. A fac
 
 Phrasings:
 
-**`withdrawal`.** Tools: all three. Walk: named accounts, then the Fidelity sibling. Calculator and policy passages are required.
+**`withdrawal`.** The phrasings match the Schwab and Vanguard account literals. The plan link then reaches the Fidelity account.
 
 - I need $50,000 for an unexpected expense. Should I take it from the Schwab account or the Vanguard account?
 - Where should I pull fifty thousand dollars, Charles Schwab or the Roth at Vanguard?
 - If I have to raise 50000 in cash, which is the better source, the joint brokerage or the Vanguard IRA?
 
-**`bridge_funding`.** Tools: WealthPlanning and AccountData. Seed: the bridge goal, then the account on the inverse of `fwp:fundsGoal`.
+**`bridge_funding`.** The phrasings match the bridge goal's name, which includes "age 53" and "59.5". The inverse of `fwp:fundsGoal` reaches the Schwab account.
 
 - Which account is funding the early retirement bridge?
 - What pays for the goal that runs until David is 59 and a half?
 - Where does the money for the age-53 bridge sit?
 
-**`roth_owner`.** Tools: AccountData and CustomerProfile. Seed: the Vanguard account, then `hasPrimaryAccountHolder` and `isPlayedBy`.
+**`roth_owner`.** The phrasings match Elena's name and the Vanguard account literals. The holder link from that account reaches David.
 
 - Who owns the Vanguard account?
 - Is Elena on the Roth IRA?
 - Whose name is on the Vanguard Roth?
 
-**`asset_location`.** Tool: AccountData. Seed: every holding, its account, and that account's tax bucket.
+**`asset_location`.** The phrasings match the holding-name literals "bond" and "equity". `fwp:heldIn` reaches each account, and `fwp:hasTaxTreatment` reaches its bucket.
 
 - Where are the bonds?
 - Which account holds the bond fund?
 - Are the equities in the taxable account and the Roth?
 
-**`filing_unit`.** Tool: CustomerProfile. Seed: `fwp:household_miller`, its members, its head, and `fwp:filingStatus`.
+**`filing_unit`.** The phrasings match the household name and the household comment that these people file together. `fwp:hasMember` includes `fwp:hasHeadOfHousehold` because the TBox says it is a subproperty.
 
 - Who is in the Miller household?
 - Who files this return?
 - Is the head of household also a member?
 
-**`tax_treatment`.** Tool: AccountData. Seed: the Schwab account, `fwp:accountCategory`, and `fwp:hasTaxTreatment`.
+**`tax_treatment`.** The phrasings match the Schwab account and the labels on `fwp:accountCategory` ("account registration") and `fwp:TaxBucket`.
 
 - What is the tax treatment of the Schwab account?
 - Is the joint brokerage taxable, or is that just its registration?
 - Which tax bucket is the Charles Schwab account in?
 
-**`no_such_fact`.** Tool: AccountData for the plan's rebalancing frequency, and the policy index for the early-distribution passage. The walk stops there.
+**`no_such_fact`.** The phrasings match `fwp:rebalancingFrequency` and the early-distribution passage. The graph has no target-weight property and no penalty amount, so the answer says those values were not retrieved.
 
 - What should the quarterly rebalance buy?
 - What are the target weights?
@@ -112,7 +111,7 @@ demo/
     app/
       store.py              load TTL + JSON-LD
       tools.py              three projections
-      grounding.py          OntologyRAG gazetteer
+      grounding.py          match question text to the graph
       walk.py               GraphRAG neighborhood
       policy.py             passages and embeddings
       calculator.py         SPEC arithmetic
@@ -138,18 +137,18 @@ sequenceDiagram
   participant LLM
 
   UI->>Controller: question, household_miller
-  Controller->>TBox: ground phrases
-  Controller->>TBox: inverse providesInstancesOf
-  Controller->>Tools: CustomerProfile, WealthPlanning, AccountData
-  Tools-->>Controller: three payloads
-  Controller->>Walk: named accounts only
-  Controller->>LLM: neighborhood so far
-  LLM-->>Controller: missing sibling, rules, or figures
-  Controller->>Walk: plan siblings
-  Controller->>Policy: passages for the grounded buckets
-  Controller->>Calc: rates, basis, balances, dates
-  Controller->>LLM: full trace
-  LLM-->>UI: answer with citations
+  Controller->>TBox: match labels, comments, and literals
+  Controller->>TBox: inverse providesInstancesOf for grounded types
+  Controller->>Tools: only the tools that match returns
+  Tools-->>Controller: payloads
+  Controller->>Walk: two hops along TBox object properties
+  Controller->>Policy: passages similar to the question
+  Controller->>Calc: formulas whose operands were retrieved
+  Controller->>LLM: trace and frontier edges
+  LLM-->>Controller: expand this subject and property, or final
+  Controller->>Walk: expand only when both IRIs are in the graph
+  Controller->>LLM: updated trace
+  LLM-->>UI: answer citing the trace
 ```
 
 On startup the process loads the two source files into one rdflib graph.
@@ -163,22 +162,13 @@ Tool projections are queries over that graph. The merged working graph for the w
 
 ## OntologyRAG grounding
 
-Grounding is a gazetteer. It maps the phrasing to an intent id in the question catalog, then binds the names in that phrasing to IRIs. Every phrasing of one intent produces the same seeds.
+Grounding builds its lexicon from the loaded graph. There is no phrase list and no intent id.
 
-| Text in the question | Binding |
-| --- | --- |
-| Schwab, Charles Schwab, joint brokerage | `fwp:institutionName` "Charles Schwab" on `fwp:account_taxable_brokerage` |
-| Vanguard, Roth at Vanguard, Vanguard IRA | `fwp:institutionName` "Vanguard" on `fwp:account_roth_ira` |
-| Fidelity, bond fund | `fwp:account_traditional_ira` and `fwp:holding_fidelity_bond` |
-| need $50,000, pull fifty thousand, raise 50000 | Intent `withdrawal` |
-| bridge, age 53, 59 and a half | Intent `bridge_funding`, goal `fwp:goal_early_retirement` |
-| who owns, whose name, is Elena on | Intent `roth_owner` |
-| household, who files, head of household | Intent `filing_unit` |
-| tax treatment, tax bucket, registration | Intent `tax_treatment` |
-| target weights, what should the rebalance buy, 10 percent penalty | Intent `no_such_fact` |
-| household chip | `fwp:household_miller` |
+At startup the corpus is every `rdfs:label`, every `rdfs:comment`, every datatype literal, and the local name of every IRI, split on camel case and underscores. A hit is a case-insensitive containment of one of those strings in the question, or an embedding of the question near that string. The embedding ranker and the lexical ranker are the same function used for policy passages. The card shows the matched string, the IRI it came from, and the score.
 
-Tool selection reads the stored `fwp:providesInstancesOf` triples and walks `^fwp:providesInstancesOf` from the classes that intent activates. It does not look for a stored `fwp:providedByTool` triple. The card lists each class and the tool it selected. Only `withdrawal` activates all three tools.
+A matched individual is a seed. A matched class is a class seed. A matched property adds that property and the classes in its domain and range. The household chip adds `fwp:household_miller` as a seed on every run.
+
+Tool selection walks `^fwp:providesInstancesOf` from each class seed and from each `rdf:type` of an individual seed, including superclasses declared in the Turtle file. It does not look for a stored `fwp:providedByTool` triple. The card lists each class and the tool that triple returned. A question that only matches account literals calls AccountData. A question that also matches a goal name or a person name calls the tool bound to that type. The same words match the same literals, so paraphrases that share those strings share the same seeds. Words that match nothing in the graph add no seed. The fix for a missed phrasing is a label or comment in the ontology, not a branch in the controller.
 
 `fwp:hasHeadOfHousehold` is an `rdfs:subPropertyOf` `fwp:hasMember`. The member lookup is a SPARQL property path that follows `rdfs:subPropertyOf*`. The card shows David returned both as the asserted head and as a member through that path. Elena is an asserted member.
 
@@ -205,22 +195,13 @@ The JSON-LD file nests accounts and goals inside the plan. The queries lift each
 
 ## GraphRAG walk
 
-The walk is a neighborhood on the merged graph along properties the TBox declares. It is not a community-summary index.
+The walk is the same neighborhood function for every question. It is not a community-summary index, and it does not switch on the check name.
 
-First hop, named accounts only:
+From each grounded individual, follow object properties declared in the TBox, and properties declared `owl:inverseOf` those properties, for two hops. When a property has subproperties, the hop uses a SPARQL path over `rdfs:subPropertyOf*`, so a member hop also returns `fwp:hasHeadOfHousehold`. Every triple whose subject is a reached individual is included. Edges that leave that frontier stay on the trace as unresolved IRIs.
 
-1. Seed the accounts whose `fwp:institutionName` grounded to Schwab and Vanguard.
-2. Expand one step along `fwp:hasTaxTreatment`, `fwp:hasHolding`, `fwp:fundsGoal`, `fibo-fbc-pas-caa:hasPrimaryAccountHolder`, `fibo-fbc-pas-caa:hasSecondaryAccountHolder`, and from the holder along `cmns-rlcmp:isPlayedBy`.
-3. From each account, follow the inverse of `fwp:includesAccount` to the plan, then stop. Do not yet pull sibling accounts.
+A Schwab seed therefore reaches the plan in one hop and the Fidelity account in the second hop, because `fwp:includesAccount` connects them. The Fidelity holding, bucket, and goal are triples of that reached account. No rule names Fidelity.
 
-That neighborhood is what the first model call sees. It has the Schwab taxable lot and the Vanguard Roth, their buckets, holdings, goals, and David as holder. It does not yet have the Fidelity IRA.
-
-Second hop, after the loop guard:
-
-1. From the plan, follow `fwp:includesAccount` to every account and expand any account not already in the neighborhood. That adds the Fidelity traditional IRA, its bond holding, its tax-deferred bucket, and its retirement-income goal.
-2. Attach the household datatype properties needed for the rules: `fwp:asOfDate`, the three rates, and `fwp:filingStatus`, plus `fwp:dateOfBirth` for the holder.
-
-The walk card draws the four paths from the use case:
+The walk card draws whichever of these paths the neighborhood actually contains:
 
 - account to holder role to person
 - account to tax bucket
@@ -238,11 +219,11 @@ Passages live in `demo/backend/policy/` as short original paragraphs. They state
 - Roth contribution basis and earnings are different amounts. Earnings are not a qualified distribution at the retrieved age. Ordering of Roth withdrawals is a passage, not an axiom.
 - A traditional IRA distribution with `fwp:iraNondeductibleBasis` of zero is pre-tax ordinary income at `fwp:marginalOrdinaryRate`. The 10 percent early-distribution additional tax is described in a passage and is not computed.
 
-At startup each passage and each account-neighborhood card is embedded with fastembed. The neighborhood cards exist so a question that does not name an institution can still find an account. The scripted question names Schwab and Vanguard, so the vector step is there to retrieve passages. The card shows the query text, the scores, and the passage ids that were kept. A lexical overlap ranker implements the same search function when the embedding model cannot be loaded, and the card says which ranker ran.
+At startup each passage is embedded with fastembed, using the same ranker as grounding. The query is the question text. The card shows the scores and the passage ids above the cutoff. Passages below the cutoff stay out. A lexical overlap ranker implements the same search function when the embedding model cannot be loaded, and the card says which ranker ran.
 
 ## Calculator
 
-The calculator reads only values present in the walk. It writes the figures the data contract already checks:
+The calculator is a set of formulas. A formula runs only when every operand is a number already in the neighborhood, plus a money amount parsed from the question when the formula needs one. A question whose neighborhood lacks a cost basis does not get a gain figure. When the $50,000 question's neighborhood has the operands, the formulas produce the figures the data contract checks:
 
 - Taxable lot: gain ratio `(1,200,000 − 720,000) / 1,200,000 = 0.40`. On 50,000 of proceeds the gain is 20,000. Tax at 0.15 + 0.038 is 3,760. Net is 46,240. Proceeds to net 50,000 are `50000 / 0.9248 = 54065.74`.
 - Bridge shortfall: `1,500,000 − 1,200,000 = 300,000`.
@@ -259,22 +240,16 @@ The adapter sends the question, the trace so far, and a response schema:
 
 ```json
 {
-  "status": "need_context | final",
-  "missing": ["plan_siblings", "policy_passages", "calculator"],
+  "status": "expand | final",
+  "expand": [{ "subject": "iri", "property": "iri" }],
   "answer": "string, present only when final",
   "citations": [{ "stepId": "string", "iri": "string", "note": "string" }]
 }
 ```
 
-`missing` may contain only those three tokens. The controller ignores anything else.
-
-Call one happens after the named-account walk. The prompt lists what the neighborhood contains and asks whether plan siblings, policy passages, or calculator figures are still required. The controller then runs any of those three that are still empty, including when the model returns `final` early. The trace has two lines for that hop when both happen: the model request, and the guard.
-
-Call two receives the sibling walk, the passages, and the calculator output. It must produce `final`. The answer has to mention the Schwab taxable account and the bridge goal, the Vanguard Roth and the tax-free goal, and the Fidelity traditional IRA and the retirement-income goal. Each tax figure in the prose must match a calculator citation. Rules must cite a passage id.
+Call one sees the neighborhood, the passages, the calculator output, and the unresolved frontier edges. It may name subject and property IRIs to expand, or it may return `final`. The controller expands a pair only when the subject is already in the neighborhood and the property is an object property in the TBox. Any other pair is dropped and shown on the trace as not in the graph. One expansion round is allowed. Call two, when it happens, must return `final`.
 
 The system prompt tells the model to explain the trace, to avoid figures that are not in the calculator card, and to avoid rules that are not in a retrieved passage. The UI shows the prompt on the model card, collapsed, and the raw JSON above the rendered answer.
-
-Hop budget after the first model call is one. A repeated `missing` token does not start another call.
 
 ## Trace events
 
@@ -291,7 +266,7 @@ Every card is one server-sent event. `id` is stable for citations.
 | `policy` | ranker, passage id, score, text |
 | `calculator` | inputs, outputs, passage id for the holding-period rule |
 | `model` | call number, prompt, raw JSON |
-| `guard` | tokens the controller added |
+| `expand` | requested subject and property, and whether the graph accepted the pair |
 | `final` | answer markdown and citations |
 
 ## Screen
@@ -299,33 +274,31 @@ Every card is one server-sent event. `id` is stable for citations.
 One page.
 
 - Header states that this is a retrieval demonstration and not tax advice.
-- The question control lists each intent, and under it the phrasings from the catalog. Choosing a second phrasing of the same intent reruns the trace. The household chip is `fwp:household_miller` and is not editable in this version.
+- The question control lists the check phrasings. Choosing a second phrasing of the same check reruns the same loop. The household chip is `fwp:household_miller` and is not editable in this version.
 - The timeline grows under the question. Tool cards show the projection, including IRIs that are not yet expanded. The walk card highlights the four paths. Model cards show call 1 and call 2 separately.
 - The answer panel pins under the timeline and links each citation to its card.
 
-The first version has no login and no second household. The model does not choose tools. After grounding, the controller selects the tools from `fwp:providesInstancesOf`. The model may only report the fixed `missing` tokens `plan_siblings`, `policy_passages`, and `calculator`.
+The first version has no login and no second household. The model does not choose tools. Tools come from `fwp:providesInstancesOf` on the types the text match grounded. An expansion is executed only when the subject and the property are already in the graph.
 
 ## Acceptance
 
 A scripted run against the current Turtle and JSON-LD files passes when:
 
-1. The trace shows all three tools, and each payload contains only its classes, with cross-tool links as IRIs.
-2. Tax-bucket individuals are attributed to the Turtle file.
-3. The first walk contains Schwab and Vanguard and does not contain the Fidelity account. The second hop adds it from `fwp:includesAccount`.
-4. David is returned for a member query through `rdfs:subPropertyOf`.
-5. Calculator outputs match the figures in the data contract, and the early-distribution additional tax is absent from those outputs.
-6. The final answer cites the three accounts, their buckets, their goals, the calculator, and at least one policy passage.
-7. The timeline shows two model calls and the controller guard for `withdrawal`.
-8. Every phrasing of one intent grounds to the same intent id, the same seed IRIs, and the same required citations. `no_such_fact` cites neither target weights nor a computed penalty.
+1. A tool payload contains only the classes in its binding, with cross-tool links as IRIs. Tax-bucket individuals are attributed to the Turtle file when AccountData runs.
+2. The Schwab phrasings ground to `fwp:account_taxable_brokerage` and `fwp:account_roth_ira` by matching literals. The Fidelity account is in that neighborhood because `fwp:includesAccount` reaches it in two hops.
+3. The household phrasings return David as a member through `rdfs:subPropertyOf`, using that same walk.
+4. Calculator outputs match the data-contract figures only when the operands were retrieved. No run outputs a 10 percent penalty amount.
+5. Every phrasing in a check grounds to the same seed IRIs. The answer cites only IRIs and passages on that trace.
+6. An expansion whose property is not in the TBox is dropped and is not cited.
 
 ## Build order
 
 1. Load both RDF files and implement the three projections with tests for the partition rules.
-2. Implement grounding and `^fwp:providesInstancesOf` selection.
-3. Implement the named-account walk, the sibling hop, and the subproperty member query.
+2. Implement graph-text grounding and `^fwp:providesInstancesOf` selection.
+3. Implement the two-hop walk, including inverses and subproperty paths.
 4. Add the policy passages, embeddings, and the lexical fallback.
 5. Add the calculator and lock its outputs to the data-contract figures.
-6. Add the model adapter, the response schema, and the one-hop guard.
+6. Add the model adapter and the expansion check against the TBox.
 7. Stream the trace over server-sent events.
 8. Build the timeline page and run every phrasing in the question catalog in the browser.
 
