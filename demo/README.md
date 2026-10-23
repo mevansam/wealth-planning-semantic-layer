@@ -1,6 +1,27 @@
 # Demo application — technical specification
 
-This document plans the application that runs the [use case](../README.md) against the [data contract](../SPEC.md). No application code is in this folder yet.
+This document specifies the application that runs the [use case](../README.md) against the [data contract](../SPEC.md).
+
+## Run
+
+From `demo/backend`, create a virtual environment, install the package with the `dev` extra, and start the API:
+
+```text
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+RANKER=lexical .venv/bin/uvicorn app.main:app --port 8787
+```
+
+`RANKER=lexical` skips the embedding model download. Leave it unset to let fastembed load when it is installed (`pip install -e ".[embed]"`). Set `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` to use a chat model. Without a key, the answer is written from the trace.
+
+From `demo/frontend`:
+
+```text
+npm install
+npm run dev
+```
+
+The page is at `http://localhost:5173`. It streams `POST /api/ask`.
 
 The demo runs the questions below through one loop and shows every step on screen. One example is:
 

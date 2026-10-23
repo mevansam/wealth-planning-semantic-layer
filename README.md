@@ -79,4 +79,4 @@ Classes, diagrams, property tables, household facts, and what the $50,000 questi
 
 ## Implementation
 
-The demo application specification is [demo/README.md](demo/README.md). It describes the retrieval loop, the tool queries over the household JSON-LD, and the trace UI. Application code is not written yet.
+The demo application is specified in [demo/README.md](demo/README.md). That document describes the retrieval loop, the tool queries over the household JSON-LD, the trace UI, and how to run it.

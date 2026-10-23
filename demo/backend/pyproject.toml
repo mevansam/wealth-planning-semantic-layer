@@ -1,0 +1,21 @@
+[project]
+name = "wealth-demo"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "rdflib>=7.1.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.32.0",
+  "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+embed = ["fastembed>=0.4.0"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
