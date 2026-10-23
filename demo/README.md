@@ -303,7 +303,7 @@ One page.
 - The timeline grows under the question. Tool cards show the projection, including IRIs that are not yet expanded. The walk card highlights the four paths. Model cards show call 1 and call 2 separately.
 - The answer panel pins under the timeline and links each citation to its card.
 
-The first version has no login, no second household, and no free-form tool calling.
+The first version has no login and no second household. The model does not choose tools. After grounding, the controller selects the tools from `fwp:providesInstancesOf`. The model may only report the fixed `missing` tokens `plan_siblings`, `policy_passages`, and `calculator`.
 
 ## Acceptance
 
